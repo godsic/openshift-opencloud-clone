@@ -256,6 +256,17 @@ lighttpd.</p>
      dir-listing.activate = "disable"
    }</pre>
 </div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The <strong>check-local</strong> option of lighttpd&#8217;s <a class="reference external" href="http://redmine.lighttpd.net/projects/1/wiki/Docs_ModFastCGI">fastcgi</a>  must be enabled.
+It is sometimes disabled for security reasons. For example,
+the PHP process can run as a different user than lighttpd.
+Then, lighttpd might not be able to read/check the PHP files
+which the PHP process is able to read. Disabling
+<strong>check-local</strong> results in an incorrect <strong>PATH_INFO</strong>
+in PHP which produces a strange behavior of owncloud (such as
+incompletely loaded pages).</p>
+</div>
 </div>
 <div class="section" id="yaws-configuration">
 <h2>Yaws Configuration<a class="headerlink" href="#yaws-configuration" title="Permalink to this headline">¶</a></h2>

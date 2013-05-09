@@ -75,7 +75,7 @@ class OC_Util {
 	public static function getVersion() {
 		// hint: We only can count up. Reset minor/patchlevel when
 		// updating major/minor version number.
-		return array(5, 00, 3);
+		return array(5, 00, 6);
 	}
 
 	/**
@@ -83,7 +83,7 @@ class OC_Util {
 	 * @return string
 	 */
 	public static function getVersionString() {
-		return '5.0.3';
+		return '5.0.5';
 	}
 
 	/**
@@ -278,7 +278,10 @@ class OC_Util {
 				'hint'=>'Please ask your server administrator to install the module.');
 			$web_server_restart= false;
 		}
-		if(ini_get('safe_mode')) {
+		if (((strtolower(@ini_get('safe_mode')) == 'on')
+			|| (strtolower(@ini_get('safe_mode')) == 'yes')
+			|| (strtolower(@ini_get('safe_mode')) == 'true')
+			|| (ini_get("safe_mode") == 1 ))) {
 			$errors[]=array('error'=>'PHP Safe Mode is enabled. ownCloud requires that it is disabled to work properly.',
 				'hint'=>'PHP Safe Mode is a deprecated and mostly useless setting that should be disabled. Please ask your server administrator to disable it in php.ini or in your webserver config.');
 			$web_server_restart= false;
@@ -630,16 +633,26 @@ class OC_Util {
 	 * Check if the ownCloud server can connect to the internet
 	 */
 	public static function isinternetconnectionworking() {
-
+		$proxy = OC_Config::getValue('proxy', '');
+		if($proxy <> '') {
+			list($proxy_host, $proxy_port) = explode(':',$proxy);
+			$connected = @fsockopen($proxy_host, $proxy_port, $errno, $errstr, 5);
+			if ($connected) {
+				fclose($connected);
+				return true;
+			}
+			\OC_Log::write('core', 'Couldn\'t connect to proxy server', \OC_log::WARN);
+			return false;
+		}
 		// try to connect to owncloud.org to see if http connections to the internet are possible.
-		$connected = @fsockopen("www.owncloud.org", 80);
+		$connected = @fsockopen("www.owncloud.org", 80, $errno, $errstr, 10);
 		if ($connected) {
 			fclose($connected);
 			return true;
 		}else{
 
 			// second try in case one server is down
-			$connected = @fsockopen("apps.owncloud.com", 80);
+			$connected = @fsockopen("apps.owncloud.com", 80, $errno, $errstr, 10);
 			if ($connected) {
 				fclose($connected);
 				return true;

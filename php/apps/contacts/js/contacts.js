@@ -275,6 +275,10 @@ OC.Contacts = OC.Contacts || {};
 					var checksum = self.checksumFor(obj);
 					var value = self.valueFor(obj);
 					var parameters = self.parametersFor(obj);
+					if(parameters['TYPE'] && parameters['TYPE'].indexOf('PREF') !== -1) {
+						parameters['PREF'] = 1;
+						parameters['TYPE'].splice(parameters['TYPE'].indexOf('PREF', 1));
+					}
 					if(checksum && checksum !== 'new') {
 						self.pushToUndo({
 							action:'save', 
@@ -679,10 +683,10 @@ OC.Contacts = OC.Contacts || {};
 	Contact.prototype.renderListItem = function(isnew) {
 		this.$listelem = this.$listTemplate.octemplate({
 			id: this.id,
-			name: isnew ? escapeHTML(this.getPreferredValue('FN', '')) : this.getPreferredValue('FN', ''),
-			email: isnew ? escapeHTML(this.getPreferredValue('EMAIL', '')) : this.getPreferredValue('EMAIL', ''),
-			tel: isnew ? escapeHTML(this.getPreferredValue('TEL', '')) : this.getPreferredValue('TEL', ''),
-			adr: isnew ? escapeHTML(this.getPreferredValue('ADR', []).clean('').join(', ')) : this.getPreferredValue('ADR', []).clean('').join(', '),
+			name: isnew ? this.getPreferredValue('FN', '') : this.getPreferredValue('FN', ''),
+			email: isnew ? this.getPreferredValue('EMAIL', '') : this.getPreferredValue('EMAIL', ''),
+			tel: isnew ? this.getPreferredValue('TEL', '') : this.getPreferredValue('TEL', ''),
+			adr: isnew ? this.getPreferredValue('ADR', []).clean('').join(', ') : this.getPreferredValue('ADR', []).clean('').join(', '),
 			categories: this.getPreferredValue('CATEGORIES', [])
 				.clean('').join(' / ')
 		});
@@ -1395,7 +1399,7 @@ OC.Contacts = OC.Contacts || {};
 		$(document).bind('status.contact.updated', function(e, data) {
 			if(['FN', 'EMAIL', 'TEL', 'ADR', 'CATEGORIES'].indexOf(data.property) !== -1) {
 				data.contact.getListItemElement().remove();
-				self.insertContact(self.contacts[parseInt(data.contact.id)].renderListItem(true));
+				self.insertContact(data.contact.renderListItem(true));
 			}
 		});
 	};

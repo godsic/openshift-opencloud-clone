@@ -775,12 +775,14 @@ OC.Contacts = OC.Contacts || {
 		 * @param object $list A jquery object of an unordered list
 		 * @param object book An object with the properties 'id', 'name' and 'permissions'.
 		 */
-		var appendAddressBook = function($list, book) {
-			self.contacts.setAddressbook(book);
+		var appendAddressBook = function($list, book, add) {
+			if(add) {
+				self.contacts.setAddressbook(book);
+			}
 			var $li = self.$addressbookTmpl.octemplate({
 				id: book.id,
 				permissions: book.permissions,
-				displayname: escapeHTML(book.displayname)
+				displayname: book.displayname
 			});
 
 			$li.find('a.action').tipsy({gravity: 'w'});
@@ -838,51 +840,60 @@ OC.Contacts = OC.Contacts || {
 			$list.append($li);
 		};
 
+		var $addAddressBookNew = this.$settings.find('.addaddressbook');
+		var $addAddressBookPart = $addAddressBookNew.next('ul');
+		var $addInput = $addAddressBookPart.find('input.addaddressbookinput').focus();
+		$addInput.on('keydown', function(event) {
+			if(event.keyCode === 13) {
+				event.stopPropagation();
+				$addAddressBookPart.find('.addaddressbookok').trigger('click');
+			}
+		});
+		$addAddressBookPart.on('click keydown', 'button', function(event) {
+			if(wrongKey(event)) {
+				return;
+			}
+			if($(this).is('.addaddressbookok')) {
+				if($addInput.val().trim() === '') {
+					return false;
+				} else {
+					var name = $addInput.val().trim();
+					$addInput.addClass('loading');
+					$addAddressBookPart.find('button input').prop('disabled', true);
+					console.log('adding', name);
+					self.addAddressbook({
+						name: name,
+						description: ''
+					}, function(response) {
+						if(!response || !response.status) {
+							OC.notify({
+								message:t('contacts', 'Network or server error. Please inform administrator.')
+							});
+							return false;
+						} else if(response.status === 'error') {
+							OC.notify({message: response.message});
+							return false;
+						} else if(response.status === 'success') {
+							var book = response.addressbook;
+							var $list = self.$settings.find('[data-id="addressbooks"]').next('ul');
+							appendAddressBook($list, book, true);
+						}
+						$addInput.removeClass('loading');
+						$addAddressBookPart.find('button input').prop('disabled', false);
+						$addAddressBookPart.hide().prev('button').show();
+					});
+				}
+			} else if($(this).is('.addaddressbookcancel')) {
+				$addAddressBookPart.hide().prev('button').show();
+			}
+		});
+
 		this.$settings.find('.addaddressbook').on('click keydown', function(event) {
 			if(wrongKey(event)) {
 				return;
 			}
 			$(this).hide();
-			var $addAddressbookPart = $(this).next('ul').show();
-			var $addinput = $addAddressbookPart.find('input.addaddressbookinput').focus();
-			$addAddressbookPart.on('click keydown', 'button', function(event) {
-				if(wrongKey(event)) {
-					return;
-				}
-				if($(this).is('.addaddressbookok')) {
-					if($addinput.val().trim() === '') {
-						return false;
-					} else {
-						var name = $addinput.val().trim();
-						$addinput.addClass('loading');
-						$addAddressbookPart.find('button input').prop('disabled', true);
-						console.log('adding', name);
-						self.addAddressbook({
-							name: name,
-							description: ''
-						}, function(response) {
-							if(!response || !response.status) {
-								OC.notify({
-									message:t('contacts', 'Network or server error. Please inform administrator.')
-								});
-								return false;
-							} else if(response.status === 'error') {
-								OC.notify({message: response.message});
-								return false;
-							} else if(response.status === 'success') {
-								var book = response.addressbook;
-								var $list = self.$settings.find('[data-id="addressbooks"]').next('ul');
-								appendAddressBook($list, book);
-							}
-							$addinput.removeClass('loading');
-							$addAddressbookPart.find('button input').prop('disabled', false);
-							$addAddressbookPart.hide().prev('button').show();
-						});
-					}
-				} else if($(this).is('.addaddressbookcancel')) {
-					$addAddressbookPart.hide().prev('button').show();
-				}
-			});
+			$addAddressBookPart.show();
 		});
 
 		this.$settings.find('h2').on('click keydown', function(event) {
@@ -903,7 +914,7 @@ OC.Contacts = OC.Contacts || {
 
 				$list.empty();
 				$.each(self.contacts.addressbooks, function(id, book) {
-					appendAddressBook($list, book);
+					appendAddressBook($list, book, false);
 				});
 				if(typeof OC.Share !== 'undefined') {
 					OC.Share.loadIcons('addressbook');
@@ -1725,54 +1736,59 @@ OC.Contacts = OC.Contacts || {
 };
 
 (function( $ ) {
-	// Support older browsers. From http://www.yelotofu.com/2008/08/jquery-outerhtml/
-	jQuery.fn.outerHTML = function(s) {
-		return s
-			? this.before(s).remove()
-			: jQuery('<p>').append(this.eq(0).clone()).html();
-	};
 	/**
 	* Object Template
 	* Inspired by micro templating done by e.g. underscore.js
 	*/
 	var Template = {
-		init: function(options, elem) {
+		init: function(vars, options, elem) {
 			// Mix in the passed in options with the default options
+			this.vars = vars;
 			this.options = $.extend({},this.options,options);
 
-			// Save the element reference, both as a jQuery
-			// reference and a normal reference
-			this.elem  = elem;
-			this.$elem = $(elem);
+			this.elem = elem;
+			var self = this;
 
-			var _html = this._build(this.options);
-			//console.log('html', this.$elem.html());
+			if(typeof this.options.escapeFunction === 'function') {
+				$.each(this.vars, function(key, val) {
+					if(typeof val === 'string') {
+						self.vars[key] = self.options.escapeFunction(val);
+					}
+				});
+			}
+
+			var _html = this._build(this.vars);
 			return $(_html);
 		},
 		// From stackoverflow.com/questions/1408289/best-way-to-do-variable-interpolation-in-javascript
 		_build: function(o){
-			var data = this.$elem.html();
-				//this.$elem.attr('type') === 'text/template'
-				//? this.$elem.html() : this.$elem.outerHTML();
-			return data.replace(/{([^{}]*)}/g,
-				function (a, b) {
-					var r = o[b];
-					return typeof r === 'string' || typeof r === 'number' ? r : a;
-				}
-			);
+			var data = this.elem.attr('type') === 'text/template' ? this.elem.html() : this.elem.get(0).outerHTML;
+			try {
+				return data.replace(/{([^{}]*)}/g,
+					function (a, b) {
+						var r = o[b];
+						return typeof r === 'string' || typeof r === 'number' ? r : a;
+					}
+				);
+			} catch(e) {
+				console.error(e, 'data:', data)
+			}
 		},
 		options: {
+			escapeFunction: function(str) {return $('<i></i>').text(str).html();}
 		}
 	};
 
-	$.fn.octemplate = function(options) {
-		if ( this.length ) {
+	$.fn.octemplate = function(vars, options) {
+		var vars = vars ? vars : {};
+		if(this.length) {
 			var _template = Object.create(Template);
-			return _template.init(options, this);
+			return _template.init(vars, options, this);
 		}
 	};
 
 })( jQuery );
+
 
 $(document).ready(function() {
 
